@@ -1,0 +1,98 @@
+---
+title: "Swiss Fertility and Socioeconomic Indicators (1888) Data"
+output: html_notebook
+author: Antonio Fabián Linares Brito | Reynier Ramos González
+---
+
+## Introducción
+
+El dataset "swiss" es un conjunto de datos que contiene información sobre fertilidad y diversos indicadores socioeconómicos de 47 provincias francófonas de Suiza alrededor de 1888. **Este análisis tiene dos objetivos principales**:
+
+1. Explorar las relaciones entre variables socioeconómicas, educativas y religiosas para identificar patrones subyacentes.
+2. Reducir la dimensionalidad de los datos manteniendo la mayor información posible, lo que facilita su visualización e interpretación.
+
+El **Análisis de Componentes Principales (PCA)** es adecuado para este caso porque:
+- Las variables están en distintas escalas (porcentajes, tasas), lo que requiere estandarización previa.
+- Existen posibles correlaciones entre variables (ej. educación vs. fertilidad) que el PCA puede sintetizar en componentes independientes.
+- Permite cuantificar cuánta varianza explica cada componente, identificando las variables más influyentes.
+
+```{r}
+# Cargar el dataset
+data("swiss")
+head(swiss)
+```
+
+#### Variables:
+
+- `Fertility`: Tasa de fertilidad general (Ig). Refleja comportamientos reproductivos vinculados a factores culturales y socioeconómicos.
+- `Agriculture`: % de hombres empleados en agricultura. Indicador de desarrollo económico.
+- `Examination`: % de reclutas con calificación máxima en examen militar. Relacionado con el acceso a educación básica.
+- `Education`: % de población con educación más allá de primaria. Proxy de desarrollo educativo.
+- `Catholic`: % de población católica. Muestra división religiosa histórica en Suiza.
+- `Infant.Mortality`: % de mortalidad infantil. Indicador de condiciones de salud pública.
+
+## EDA
+
+```{r}
+library(corrplot)
+corrplot(cor(swiss), method = "number", tl.col = "black", main = "Matriz de correlaciones")
+```
+
+- Fertilidad correlaciona positivamente con Agricultura (+0.35) y Catholic (+0.46), y negativamente con Educación (-0.66).
+- Educación y Examen militar muestran alta correlación negativa (-0.70), sugiriendo que regiones con mayor educación formal tienen menos reclutas con calificación máxima (posiblemente por menor participación en ejército).
+- Estas relaciones justifican el uso de PCA para sintetizar información redundante.
+
+## Procesamiento
+
+```{r}
+swiss_scaled <- scale(swiss)
+pca_result <- prcomp(swiss_scaled, center = TRUE, scale. = TRUE)
+summary(pca_result)
+```
+
+- Los primeros dos componentes (PC1 y PC2) explican el 72.3% de la varianza total (PC1: 53.2%, PC2: 19.1%).
+
+## Visualización/Interpretación
+
+```{r}
+# Gráfico de varianza acumulada
+cumulative_var <- cumsum(pca_result$sdev^2 / sum(pca_result$sdev^2))
+barplot(cumulative_var, 
+        names.arg = paste0("PC", 1:length(cumulative_var)),
+        ylim = c(0, 1),
+        xlab = "Componentes principales",
+        ylab = "Varianza explicada acumulada",
+        main = "Varianza explicada acumulada")
+abline(h = 0.9, col = "red", lty = 2)
+# Círculo de Correlaciones
+library(factoextra)
+fviz_pca_var(pca_result,
+             col.var = "contrib",
+             gradient.cols = c("#00AFBB", "#E7B800", "#FC4E07"),
+             repel = TRUE,
+             title = "Contribución de variables a PC1 y PC2")
+```
+
+- PC1 (53.2% de varianza):
+  - Variables clave: Educación (-0.79), Examen (+0.61), Fertility (+0.65).
+  - Contrasta regiones con alta educación y baja fertilidad (valores negativos en PC1) vs. regiones agrícolas con alta fertilidad y baja educación (valores positivos). Este componente refleja desarrollo socioeducativo.
+
+- PC2 (19.1% de varianza):
+  - Variables clave: Catholic (+0.85), Infant.Mortality (+0.48).
+  - Separa regiones católicas con mayor mortalidad infantil (valores positivos) de regiones protestantes con mejor salud infantil. Representa influencia religiosa y condiciones de salud.
+  
+```{r}
+# Cargas (loadings) de los componentes
+round(pca_result$rotation[, 1:2], 2)
+```
+
+## Conclusión
+
+1. PC1: Eje de desarrollo socioeducativo, donde educación y fertilidad son fuerzas opuestas.
+2. PC2: Eje religioso-salud, vinculando catolicismo con mayor mortalidad infantil.
+
+Esto sugiere que en la Suiza de 1888, las provincias con mayor educación tendían a menor fertilidad, mientras que el catolicismo estaba asociado a peores indicadores de salud. El PCA permitió reducir 6 variables a 2 componentes interpretables.
+
+```{r}
+sessionInfo()
+```
